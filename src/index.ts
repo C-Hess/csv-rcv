@@ -90,6 +90,8 @@ const run = async () => {
             }
             return ballot;
         });
+
+        currRound ++;
     }
     
 
