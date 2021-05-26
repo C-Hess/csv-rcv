@@ -54,10 +54,8 @@ const run = async () => {
     .filter((line) => line.split(",")[col - 1] !== undefined)
     .map((line) => line.split(",")[col - 1].split(";"));
 
-  // Remove header
-  if(ballots[0].length <= 1) {
-    ballots.shift();
-  }
+  // Remove invalid ballots
+  ballots = ballots.filter(ballot => ballot.length > 1);
 
   const categories = ballots.reduce(
     (combined, ballot) => new Set<string>([...ballot, ...combined]),
