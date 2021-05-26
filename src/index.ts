@@ -50,9 +50,9 @@ const run = async () => {
 
   let ballots = data
     .split("\n")
-    .map((line) => line.replace("\r", ""))
+    .map((line) => line.trim().replace(/\r|\t|"/g, "").trim())
     .filter((line) => line.split(",")[col - 1] !== undefined)
-    .map((line) => line.split(",")[col - 1].split(";").filter(s => s.trim().length > 0));
+    .map((line) => line.split(",")[col - 1].split(";").map(s => s.trim()).filter(s => s.length > 0));
 
   // Remove invalid ballots
   ballots = ballots.filter(ballot => ballot.length > 1);
@@ -64,27 +64,26 @@ const run = async () => {
 
   let currRound = 1;
   let isWinner = false;
+  let votesAsEntries: [string, number][];
+  let votes: object;
   do {
-    let votes = tabulate(ballots, categories);
-    let votesAsEntries = Object.entries(votes) as [string, number][];
+    votes = tabulate(ballots, categories);
+    votesAsEntries = Object.entries(votes);
     isWinner = votesAsEntries.some(ent => ent[1] > 0.5);
 
     console.log(`Round ${currRound}:`);
-    console.log("\tBallots: ");
-    console.log(ballots);
-    console.log("\tVotes: ");
-    console.log(votes);
-    console.log();
 
     if(isWinner) {
-        console.log("DONE");
+      break;
     } else if (!ballots.some(b => b[0] !== undefined)) {
         console.error("\tCould not find a winner :(");
         break;
     } else if(!isWinner) {
-        const loser = votesAsEntries.reduce((currMin, currEnt) => currEnt[1] < currMin[1] ? currEnt : currMin, votesAsEntries[0]);
-        console.log("\tRemoving loser...", loser);
-        ballots = ballots.map(ballot => ballot.map(vote => vote == loser[0] ? undefined : vote))
+        const aLoser = votesAsEntries.reduce((currMin, currEnt) => currEnt[1] < currMin[1] ? currEnt : currMin, votesAsEntries[0]);
+        const allLosers = votesAsEntries.filter(ent => ent[1] === aLoser[1]);
+        console.log("\tEliminating losers: \n", allLosers.map(ent => `\t\t${ent[0]}: ${Math.round(ent[1] * 100)}%`).join("\n"));
+        const losersAsSet = new Set(allLosers.map(loser => loser[0]));
+        ballots = ballots.map(ballot => ballot.map(vote => losersAsSet.has(vote) ? undefined : vote))
 
         // Shift votes until not undefined
         ballots = ballots.map(ballot => {
@@ -94,15 +93,20 @@ const run = async () => {
             return ballot;
         });
 
+        losersAsSet.forEach(loser => categories.delete(loser));
+
         currRound ++;
     }
     
 
-  } while(!isWinner && currRound >= categories.size);
+  } while(!isWinner && currRound < 1000);
   
+  console.log("\tWinner: ", votesAsEntries.find(ent => ent[1] > 0.5)[0]);
+  console.log("\tRemaining Votes: \n", votesAsEntries.map(ent => `\t\t${ent[0]}: ${Math.round(ent[1] * 100)}%`).join("\n"))
 
   if(!isWinner) {
     console.error("\tCould not find a winner :(");
+    console.error(votes);
   }
 };
 
