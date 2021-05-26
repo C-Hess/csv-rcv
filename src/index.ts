@@ -54,6 +54,11 @@ const run = async () => {
     .filter((line) => line.split(",")[col - 1] !== undefined)
     .map((line) => line.split(",")[col - 1].split(";"));
 
+  // Remove header
+  if(ballots[0].length <= 1) {
+    ballots.shift();
+  }
+
   const categories = ballots.reduce(
     (combined, ballot) => new Set<string>([...ballot, ...combined]),
     new Set<string>()
@@ -95,8 +100,12 @@ const run = async () => {
     }
     
 
-  } while(!isWinner);
+  } while(!isWinner && currRound >= categories.size);
   
+
+  if(!isWinner) {
+    console.error("\tCould not find a winner :(");
+  }
 };
 
 run();
