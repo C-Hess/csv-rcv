@@ -52,7 +52,7 @@ const run = async () => {
     .split("\n")
     .map((line) => line.replace("\r", ""))
     .filter((line) => line.split(",")[col - 1] !== undefined)
-    .map((line) => line.split(",")[col - 1].split(";"));
+    .map((line) => line.split(",")[col - 1].split(";").filter(s => s.trim().length > 0));
 
   // Remove invalid ballots
   ballots = ballots.filter(ballot => ballot.length > 1);
