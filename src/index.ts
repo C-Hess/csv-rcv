@@ -1,24 +1,24 @@
 import { promises as fs } from "fs";
 import process from "process";
 
-const tabulate = (ballots: string[][], categories: Set<string>) => {
-  const votes = ballots.reduce(
-    (tab, bal) => {
-      tab[bal[0]]++;
-      return tab;
-    },
-    Array.from(categories).reduce((cur, cat) => {
-      cur[cat] = 0;
-      return cur;
-    }, {})
-  );
-
-  Object.entries(votes).forEach((ent) => {
-    votes[ent[0]] = ent[1] as number / ballots.length;
-  });
-
-  return votes;
-};
+const compete = (ballot: string[], orderedCategories: string[]) => {
+  const competition: number[][] = [];
+  for(let r = 0; r < orderedCategories.length; r ++) {
+    const currRun = [];
+    for(let o = 0; o < orderedCategories.length; o ++) {
+        if (o !== r) {
+          const runner = orderedCategories[r];
+          const opponent = orderedCategories[o];
+        
+          currRun.push(ballot.find(b => b === runner || b === opponent) === runner ? 1 : 0);
+        } else {
+          currRun.push(0);
+        }
+    }
+    competition.push(currRun);
+  }
+  return competition;
+}
 
 const run = async () => {
   if (process.argv.length != 4) {
@@ -62,52 +62,48 @@ const run = async () => {
     new Set<string>()
   );
 
-  let currRound = 1;
-  let isWinner = false;
-  let votesAsEntries: [string, number][];
-  let votes: object;
-  do {
-    votes = tabulate(ballots, categories);
-    votesAsEntries = Object.entries(votes);
-    isWinner = votesAsEntries.some(ent => ent[1] > 0.5);
+  const orderedCategories = Array.from(categories);
 
-    console.log(`Round ${currRound}:`);
-
-    if(isWinner) {
-      break;
-    } else if (!ballots.some(b => b[0] !== undefined)) {
-        console.error("\tCould not find a winner :(");
-        break;
-    } else if(!isWinner) {
-        const aLoser = votesAsEntries.reduce((currMin, currEnt) => currEnt[1] < currMin[1] ? currEnt : currMin, votesAsEntries[0]);
-        const allLosers = votesAsEntries.filter(ent => ent[1] === aLoser[1]);
-        console.log("\tEliminating losers: \n", allLosers.map(ent => `\t\t${ent[0]}: ${Math.round(ent[1] * 100)}%`).join("\n"));
-        const losersAsSet = new Set(allLosers.map(loser => loser[0]));
-        ballots = ballots.map(ballot => ballot.map(vote => losersAsSet.has(vote) ? undefined : vote))
-
-        // Shift votes until not undefined
-        ballots = ballots.map(ballot => {
-            while(ballot.length > 0 && ballot[0] === undefined) {
-                ballot.shift();
-            }
-            return ballot;
-        });
-
-        losersAsSet.forEach(loser => categories.delete(loser));
-
-        currRound ++;
+  const ballotPairCompetitions = ballots.map((b) => compete(b, orderedCategories));
+  let matSum = ballotPairCompetitions
+    .reduce((acc, curr) => {
+      for(let r = 0; r < acc.length; r ++) {
+        for(let c = 0; c < acc.length; c ++) {
+          acc[r][c] += curr[r][c];
+        }
+      }
+      return acc;
+    });
+  const condorcet = orderedCategories.map((cat,ind) => {
+    const winVotes = matSum[ind];
+    const lossVotes = matSum.reduce((lossCol, row) => [...lossCol, row[ind]], [])
+    let wins = 0;
+    for(let i = 0; i < winVotes.length; i ++) {
+      wins += winVotes[i] > lossVotes[i] ? 1 : 0;
     }
-    
+    return {
+      cat,
+      tally: wins
+    };
+  })
+  condorcet.sort((a, b) => b.tally - a.tally);
+  console.log("Condorcet method: ");
+  condorcet.forEach(c => console.log(`\t${c.cat}: ${c.tally}`));
 
-  } while(!isWinner && currRound < 1000);
-  
-  console.log("\tWinner: ", votesAsEntries.find(ent => ent[1] > 0.5)[0]);
-  console.log("\tRemaining Votes: \n", votesAsEntries.map(ent => `\t\t${ent[0]}: ${Math.round(ent[1] * 100)}%`).join("\n"))
-
-  if(!isWinner) {
-    console.error("\tCould not find a winner :(");
-    console.error(votes);
-  }
+  const bordaSum = ballots.reduce((curr, ballot) => {
+    ballot.forEach((b, index) => {
+      if (curr[b] === undefined) {
+        curr[b] = index;
+      } else {
+        curr[b] += index;
+      }
+    });
+    return curr;
+  }, {});
+  const bordaRes = Object.entries(bordaSum).map<{ cat: string; tally: number }>(ent => ({ cat: ent[0], tally: ent[1] as any }));
+  bordaRes.sort((a, b) => a.tally - b.tally);
+  console.log("Borda method: ");
+  bordaRes.forEach(c => console.log(`\t${c.cat}: ${c.tally}`));
 };
 
 run();
